@@ -1,0 +1,6 @@
+{
+  "name": "BiteRoute",
+  "description": "Food delivery platform with live GPS order tracking, saved addresses and payment methods, status alerts, customer feedback, and a role-based restaurant manager dashboard for fulfillment, menu, inventory, and analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

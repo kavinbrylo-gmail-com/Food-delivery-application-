@@ -1,0 +1,295 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HELPERS ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email == 'kavinbrylo@gmail.com' && request.auth.token.email_verified == true) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+             data.email is string && data.email.size() >= 3 && data.email.size() <= 120 &&
+             (!('photoUrl' in data) || data.photoUrl == null || (data.photoUrl is string && data.photoUrl.size() <= 500)) &&
+             data.orderStatusAlerts is bool &&
+             data.courierArrivalAlerts is bool &&
+             data.promoAlerts is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidAddress(data) {
+      return data.label is string && data.label.size() >= 1 && data.label.size() <= 30 &&
+             data.street is string && data.street.size() >= 2 && data.street.size() <= 150 &&
+             (!('apartment' in data) || data.apartment == null || (data.apartment is string && data.apartment.size() <= 50)) &&
+             data.city is string && data.city.size() >= 1 && data.city.size() <= 80 &&
+             (!('instructions' in data) || data.instructions == null || (data.instructions is string && data.instructions.size() <= 200)) &&
+             data.lat is number && data.lat >= -90.0 && data.lat <= 90.0 &&
+             data.lng is number && data.lng >= -180.0 && data.lng <= 180.0 &&
+             data.isDefault is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidPaymentMethod(data) {
+      return data.type in ['card', 'wallet', 'cash'] &&
+             data.brand is string && data.brand.size() >= 1 && data.brand.size() <= 30 &&
+             data.last4 is string && data.last4.size() <= 4 &&
+             (!('expiry' in data) || data.expiry == null || (data.expiry is string && data.expiry.size() <= 10)) &&
+             data.cardholderName is string && data.cardholderName.size() >= 1 && data.cardholderName.size() <= 80 &&
+             data.isDefault is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidMenuItem(data) {
+      return data.name is string && data.name.size() >= 2 && data.name.size() <= 80 &&
+             data.description is string && data.description.size() >= 2 && data.description.size() <= 300 &&
+             data.category is string && data.category.size() >= 2 && data.category.size() <= 40 &&
+             data.priceCents is int && data.priceCents > 0 && data.priceCents <= 1000000 &&
+             data.prepMinutes is int && data.prepMinutes >= 1 && data.prepMinutes <= 180 &&
+             data.calories is int && data.calories >= 0 && data.calories <= 5000 &&
+             data.rating is number && data.rating >= 0.0 && data.rating <= 5.0 &&
+             data.imageKey is string && data.imageKey.size() >= 1 && data.imageKey.size() <= 50 &&
+             data.isAvailable is bool &&
+             data.stockCount is int && data.stockCount >= 0 && data.stockCount <= 10000 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidInventoryItem(data) {
+      return data.skuName is string && data.skuName.size() >= 2 && data.skuName.size() <= 80 &&
+             data.category is string && data.category.size() >= 2 && data.category.size() <= 40 &&
+             data.quantityOnHand is int && data.quantityOnHand >= 0 && data.quantityOnHand <= 100000 &&
+             data.unit is string && data.unit.size() >= 1 && data.unit.size() <= 20 &&
+             data.reorderThreshold is int && data.reorderThreshold >= 0 && data.reorderThreshold <= 10000 &&
+             data.supplier is string && data.supplier.size() >= 1 && data.supplier.size() <= 80 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidOrder(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 80 &&
+             data.restaurantName is string && data.restaurantName.size() >= 1 && data.restaurantName.size() <= 80 &&
+             data.restaurantLat is number && data.restaurantLat >= -90.0 && data.restaurantLat <= 90.0 &&
+             data.restaurantLng is number && data.restaurantLng >= -180.0 && data.restaurantLng <= 180.0 &&
+             data.deliveryAddressLabel is string && data.deliveryAddressLabel.size() >= 1 && data.deliveryAddressLabel.size() <= 30 &&
+             data.deliveryAddressText is string && data.deliveryAddressText.size() >= 2 && data.deliveryAddressText.size() <= 220 &&
+             data.deliveryLat is number && data.deliveryLat >= -90.0 && data.deliveryLat <= 90.0 &&
+             data.deliveryLng is number && data.deliveryLng >= -180.0 && data.deliveryLng <= 180.0 &&
+             data.courierName is string && data.courierName.size() >= 1 && data.courierName.size() <= 60 &&
+             data.courierLat is number && data.courierLat >= -90.0 && data.courierLat <= 90.0 &&
+             data.courierLng is number && data.courierLng >= -180.0 && data.courierLng <= 180.0 &&
+             data.etaMinutes is int && data.etaMinutes >= 0 && data.etaMinutes <= 180 &&
+             data.status in ['placed', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'cancelled'] &&
+             data.paymentLabel is string && data.paymentLabel.size() >= 2 && data.paymentLabel.size() <= 60 &&
+             data.itemsSummary is string && data.itemsSummary.size() >= 2 && data.itemsSummary.size() <= 500 &&
+             data.items is list && data.items.size() >= 1 && data.items.size() <= 25 &&
+             (data.items.size() == 0 || data.items[0] is map) &&
+             data.subtotalCents is int && data.subtotalCents >= 0 && data.subtotalCents <= 10000000 &&
+             data.deliveryFeeCents is int && data.deliveryFeeCents >= 0 && data.deliveryFeeCents <= 1000000 &&
+             data.taxCents is int && data.taxCents >= 0 && data.taxCents <= 1000000 &&
+             data.tipCents is int && data.tipCents >= 0 && data.tipCents <= 1000000 &&
+             data.totalCents is int && data.totalCents > 0 && data.totalCents <= 15000000 &&
+             data.hasFeedback is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidReview(data) {
+      return isValidId(data.orderId) &&
+             data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 80 &&
+             data.rating is int && data.rating >= 1 && data.rating <= 5 &&
+             data.tags is list && data.tags.size() <= 6 &&
+             (data.tags.size() == 0 || data.tags[0] is string) &&
+             data.comment is string && data.comment.size() <= 500 &&
+             data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    // --- ADMINS ---
+    match /admins/{uid} {
+      allow get: if isSignedIn() && isValidId(uid) && request.auth.uid == uid;
+      allow list, create, update, delete: if false;
+    }
+
+    // --- USERS & NESTED PII ---
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'email', 'orderStatusAlerts', 'courierArrivalAlerts', 'promoAlerts', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'photoUrl', 'orderStatusAlerts', 'courierArrivalAlerts', 'promoAlerts', 'createdAt', 'updatedAt']) &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'photoUrl', 'orderStatusAlerts', 'courierArrivalAlerts', 'promoAlerts', 'updatedAt']);
+
+      allow delete: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+
+      match /addresses/{addressId} {
+        allow get: if isSignedIn() && isValidId(userId) && isValidId(addressId) && request.auth.uid == userId;
+        allow list: if isSignedIn() && request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+                         isValidId(userId) && isValidId(addressId) &&
+                         request.auth.uid == userId &&
+                         incoming().keys().hasAll(['label', 'street', 'city', 'lat', 'lng', 'isDefault', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['label', 'street', 'apartment', 'city', 'instructions', 'lat', 'lng', 'isDefault', 'createdAt', 'updatedAt']) &&
+                         isValidAddress(incoming());
+
+        allow update: if isSignedIn() &&
+                         isValidId(userId) && isValidId(addressId) &&
+                         request.auth.uid == userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidAddress(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['label', 'street', 'apartment', 'city', 'instructions', 'lat', 'lng', 'isDefault', 'updatedAt']);
+
+        allow delete: if isSignedIn() && isValidId(userId) && isValidId(addressId) && request.auth.uid == userId;
+      }
+
+      match /payment_methods/{methodId} {
+        allow get: if isSignedIn() && isValidId(userId) && isValidId(methodId) && request.auth.uid == userId;
+        allow list: if isSignedIn() && request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+                         isValidId(userId) && isValidId(methodId) &&
+                         request.auth.uid == userId &&
+                         incoming().keys().hasAll(['type', 'brand', 'last4', 'cardholderName', 'isDefault', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['type', 'brand', 'last4', 'expiry', 'cardholderName', 'isDefault', 'createdAt', 'updatedAt']) &&
+                         isValidPaymentMethod(incoming());
+
+        allow update: if isSignedIn() &&
+                         isValidId(userId) && isValidId(methodId) &&
+                         request.auth.uid == userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidPaymentMethod(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['type', 'brand', 'last4', 'expiry', 'cardholderName', 'isDefault', 'updatedAt']);
+
+        allow delete: if isSignedIn() && isValidId(userId) && isValidId(methodId) && request.auth.uid == userId;
+      }
+    }
+
+    // --- MENU ITEMS ---
+    match /menu_items/{itemId} {
+      allow get: if isSignedIn() && isValidId(itemId);
+      allow list: if isSignedIn();
+
+      allow create: if isAdmin() &&
+                       isValidId(itemId) &&
+                       incoming().keys().hasAll(['name', 'description', 'category', 'priceCents', 'prepMinutes', 'calories', 'rating', 'imageKey', 'isAvailable', 'stockCount', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['name', 'description', 'category', 'priceCents', 'prepMinutes', 'calories', 'rating', 'imageKey', 'isAvailable', 'stockCount', 'createdAt', 'updatedAt']) &&
+                       isValidMenuItem(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(itemId) &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidMenuItem(incoming()) && (
+                         (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'category', 'priceCents', 'prepMinutes', 'calories', 'rating', 'imageKey', 'isAvailable', 'stockCount', 'updatedAt'])) ||
+                         (incoming().diff(existing()).affectedKeys().hasOnly(['stockCount', 'updatedAt']) && incoming().stockCount >= 0 && incoming().stockCount < existing().stockCount)
+                       );
+
+      allow delete: if isAdmin() && isValidId(itemId);
+    }
+
+    // --- KITCHEN INVENTORY (ADMIN ONLY) ---
+    match /inventory/{skuId} {
+      allow get: if isAdmin() && isValidId(skuId);
+      allow list: if isAdmin();
+
+      allow create: if isAdmin() &&
+                       isValidId(skuId) &&
+                       incoming().keys().hasAll(['skuName', 'category', 'quantityOnHand', 'unit', 'reorderThreshold', 'supplier', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['skuName', 'category', 'quantityOnHand', 'unit', 'reorderThreshold', 'supplier', 'createdAt', 'updatedAt']) &&
+                       isValidInventoryItem(incoming());
+
+      allow update: if isAdmin() &&
+                       isValidId(skuId) &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidInventoryItem(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['skuName', 'category', 'quantityOnHand', 'unit', 'reorderThreshold', 'supplier', 'updatedAt']);
+
+      allow delete: if isAdmin() && isValidId(skuId);
+    }
+
+    // --- ORDERS ---
+    match /orders/{orderId} {
+      allow get: if isSignedIn() && isValidId(orderId) && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn() &&
+                       isValidId(orderId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().status == 'placed' &&
+                       incoming().hasFeedback == false &&
+                       incoming().keys().hasAll(['userId', 'customerName', 'restaurantName', 'restaurantLat', 'restaurantLng', 'deliveryAddressLabel', 'deliveryAddressText', 'deliveryLat', 'deliveryLng', 'courierName', 'courierLat', 'courierLng', 'etaMinutes', 'status', 'paymentLabel', 'itemsSummary', 'items', 'subtotalCents', 'deliveryFeeCents', 'taxCents', 'tipCents', 'totalCents', 'hasFeedback', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'customerName', 'restaurantName', 'restaurantLat', 'restaurantLng', 'deliveryAddressLabel', 'deliveryAddressText', 'deliveryLat', 'deliveryLng', 'courierName', 'courierLat', 'courierLng', 'etaMinutes', 'status', 'paymentLabel', 'itemsSummary', 'items', 'subtotalCents', 'deliveryFeeCents', 'taxCents', 'tipCents', 'totalCents', 'hasFeedback', 'createdAt', 'updatedAt']) &&
+                       isValidOrder(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(orderId) &&
+                       isValidOrder(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt && (
+                         (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'courierName', 'courierLat', 'courierLng', 'etaMinutes', 'updatedAt'])) ||
+                         (existing().userId == request.auth.uid && existing().status == 'placed' && incoming().status == 'cancelled' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+                         (existing().userId == request.auth.uid && existing().status == 'delivered' && existing().hasFeedback == false && incoming().hasFeedback == true && incoming().diff(existing()).affectedKeys().hasOnly(['hasFeedback', 'updatedAt']))
+                       );
+
+      allow delete: if isAdmin() && isValidId(orderId);
+    }
+
+    // --- CUSTOMER FEEDBACK / REVIEWS ---
+    match /reviews/{reviewId} {
+      allow get: if isSignedIn() && isValidId(reviewId) && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn() &&
+                       isValidId(reviewId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['orderId', 'userId', 'customerName', 'rating', 'tags', 'comment', 'createdAt']) &&
+                       incoming().keys().hasOnly(['orderId', 'userId', 'customerName', 'rating', 'tags', 'comment', 'createdAt']) &&
+                       isValidReview(incoming()) &&
+                       exists(/databases/$(database)/documents/orders/$(incoming().orderId)) &&
+                       get(/databases/$(database)/documents/orders/$(incoming().orderId)).data.userId == request.auth.uid;
+
+      allow update: if false;
+      allow delete: if isAdmin() && isValidId(reviewId);
+    }
+  }
+}

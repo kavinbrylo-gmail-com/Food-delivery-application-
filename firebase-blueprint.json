@@ -1,0 +1,169 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user profile and delivery alert preferences.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "email": { "type": "string", "description": "User email address" },
+        "photoUrl": { "type": "string", "description": "Optional profile photo URL" },
+        "orderStatusAlerts": { "type": "boolean", "description": "Enable push alerts for order status transitions" },
+        "courierArrivalAlerts": { "type": "boolean", "description": "Enable push alerts when courier is nearby" },
+        "promoAlerts": { "type": "boolean", "description": "Enable promotional menu alerts" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update" }
+      },
+      "required": ["userId", "displayName", "email", "orderStatusAlerts", "courierArrivalAlerts", "promoAlerts", "createdAt", "updatedAt"]
+    },
+    "DeliveryAddress": {
+      "title": "DeliveryAddress",
+      "description": "Saved user delivery address with GPS coordinates.",
+      "type": "object",
+      "properties": {
+        "label": { "type": "string", "description": "Address label such as Home or Work" },
+        "street": { "type": "string", "description": "Street address" },
+        "apartment": { "type": "string", "description": "Optional apartment or suite number" },
+        "city": { "type": "string", "description": "City and postal code" },
+        "instructions": { "type": "string", "description": "Optional drop-off instructions" },
+        "lat": { "type": "number", "description": "Latitude coordinate" },
+        "lng": { "type": "number", "description": "Longitude coordinate" },
+        "isDefault": { "type": "boolean", "description": "Whether this is the default address" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["label", "street", "city", "lat", "lng", "isDefault", "createdAt", "updatedAt"]
+    },
+    "PaymentMethod": {
+      "title": "PaymentMethod",
+      "description": "Tokenized/masked user payment method (never stores raw card numbers or CVV).",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["card", "wallet", "cash"] },
+        "brand": { "type": "string", "description": "Brand such as Visa, Mastercard, Google Pay, or Cash" },
+        "last4": { "type": "string", "description": "Last 4 digits for cards or empty for wallet/cash" },
+        "expiry": { "type": "string", "description": "Card expiry MM/YY" },
+        "cardholderName": { "type": "string", "description": "Name on payment method" },
+        "isDefault": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "brand", "last4", "cardholderName", "isDefault", "createdAt", "updatedAt"]
+    },
+    "MenuItem": {
+      "title": "MenuItem",
+      "description": "Restaurant menu item available for ordering and managed by restaurant admins.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "priceCents": { "type": "integer" },
+        "prepMinutes": { "type": "integer" },
+        "calories": { "type": "integer" },
+        "rating": { "type": "number" },
+        "imageKey": { "type": "string" },
+        "isAvailable": { "type": "boolean" },
+        "stockCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "description", "category", "priceCents", "prepMinutes", "calories", "rating", "imageKey", "isAvailable", "stockCount", "createdAt", "updatedAt"]
+    },
+    "InventoryItem": {
+      "title": "InventoryItem",
+      "description": "Kitchen ingredient or packaging stock SKU managed by restaurant admins.",
+      "type": "object",
+      "properties": {
+        "skuName": { "type": "string" },
+        "category": { "type": "string" },
+        "quantityOnHand": { "type": "integer" },
+        "unit": { "type": "string" },
+        "reorderThreshold": { "type": "integer" },
+        "supplier": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["skuName", "category", "quantityOnHand", "unit", "reorderThreshold", "supplier", "createdAt", "updatedAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Food delivery order with real-time GPS courier telemetry and payment summary.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "restaurantName": { "type": "string" },
+        "restaurantLat": { "type": "number" },
+        "restaurantLng": { "type": "number" },
+        "deliveryAddressLabel": { "type": "string" },
+        "deliveryAddressText": { "type": "string" },
+        "deliveryLat": { "type": "number" },
+        "deliveryLng": { "type": "number" },
+        "courierName": { "type": "string" },
+        "courierLat": { "type": "number" },
+        "courierLng": { "type": "number" },
+        "etaMinutes": { "type": "integer" },
+        "status": { "type": "string", "enum": ["placed", "preparing", "ready_for_pickup", "out_for_delivery", "delivered", "cancelled"] },
+        "paymentLabel": { "type": "string" },
+        "itemsSummary": { "type": "string" },
+        "items": { "type": "array", "description": "Bounded list of ordered line items (max 25)" },
+        "subtotalCents": { "type": "integer" },
+        "deliveryFeeCents": { "type": "integer" },
+        "taxCents": { "type": "integer" },
+        "tipCents": { "type": "integer" },
+        "totalCents": { "type": "integer" },
+        "hasFeedback": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "customerName", "restaurantName", "restaurantLat", "restaurantLng", "deliveryAddressLabel", "deliveryAddressText", "deliveryLat", "deliveryLng", "courierName", "courierLat", "courierLng", "etaMinutes", "status", "paymentLabel", "itemsSummary", "items", "subtotalCents", "deliveryFeeCents", "taxCents", "tipCents", "totalCents", "hasFeedback", "createdAt", "updatedAt"]
+    },
+    "OrderReview": {
+      "title": "OrderReview",
+      "description": "Customer rating and feedback linked to a delivered order.",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string" },
+        "userId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "rating": { "type": "integer" },
+        "tags": { "type": "array" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["orderId", "userId", "customerName", "rating", "tags", "comment", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user profile and notification settings."
+    },
+    "/users/{userId}/addresses/{addressId}": {
+      "schema": { "$ref": "#/entities/DeliveryAddress" },
+      "description": "User saved delivery addresses with GPS coordinates."
+    },
+    "/users/{userId}/payment_methods/{methodId}": {
+      "schema": { "$ref": "#/entities/PaymentMethod" },
+      "description": "User saved masked payment methods."
+    },
+    "/menu_items/{itemId}": {
+      "schema": { "$ref": "#/entities/MenuItem" },
+      "description": "Restaurant menu items readable by signed-in users, managed by admins."
+    },
+    "/inventory/{skuId}": {
+      "schema": { "$ref": "#/entities/InventoryItem" },
+      "description": "Admin-only kitchen inventory stock SKUs."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Customer orders and live courier GPS tracking state."
+    },
+    "/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/OrderReview" },
+      "description": "Customer order feedback and ratings."
+    }
+  }
+}
